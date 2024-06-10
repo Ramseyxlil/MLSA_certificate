@@ -1,9 +1,11 @@
 from docx import Document
 from docx.shared import Pt
 from docx.shared import RGBColor
-from flask import Flask, request, send_file, render_template, redirect, url_for
+from docx.enum.text import WD_COLOR_INDEX
 import os
 import pandas as pd
+from flask import Flask, request, send_file, render_template, redirect, url_for
+from docx2pdf import convert
 from zipfile import ZipFile
 
 app = Flask(__name__)
@@ -101,7 +103,10 @@ def generate_certificate(participant_name, event_name, ambassador_name):
                             apply_font_style(run, font_size=11, color=(0, 0, 0), bold=True)
 
     docx_path = os.path.join(CERTIFICATE_FOLDER, f'{participant_name}.docx')
+    pdf_path = os.path.join(CERTIFICATE_FOLDER, f'{participant_name}.pdf')
     doc.save(docx_path)
+    convert(docx_path, pdf_path)
+    os.remove(docx_path)  # Remove the intermediate .docx file
 
 
 def generate_certificates(file_path, event_name, ambassador_name):
@@ -116,7 +121,7 @@ def create_zip(event_name):
     with ZipFile(zip_file_path, 'w') as zipf:
         for folder_name, subfolders, filenames in os.walk(CERTIFICATE_FOLDER):
             for filename in filenames:
-                if filename.endswith('.docx'):
+                if filename.endswith('.pdf'):
                     file_path = os.path.join(folder_name, filename)
                     zipf.write(file_path, os.path.basename(file_path))
     return zip_file_path
