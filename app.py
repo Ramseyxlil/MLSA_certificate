@@ -1,9 +1,9 @@
-from docx import Document
-from docx.shared import Pt
-from docx.shared import RGBColor
-from flask import Flask, request, send_file, render_template, redirect, url_for
 import os
 import pandas as pd
+import convertapi
+from flask import Flask, request, send_file, render_template, redirect, url_for
+from docx import Document
+from docx.shared import Pt, RGBColor
 from zipfile import ZipFile
 
 app = Flask(__name__)
@@ -22,6 +22,9 @@ if not os.path.exists(CERTIFICATE_FOLDER):
 
 if not os.path.exists(ZIP_FOLDER):
     os.makedirs(ZIP_FOLDER)
+
+# ConvertAPI secret key
+convertapi.api_secret = 'yQBA8IqyogHySlgp'
 
 
 @app.route('/')
@@ -102,13 +105,27 @@ def generate_certificate(participant_name, event_name, ambassador_name):
 
     docx_path = os.path.join(CERTIFICATE_FOLDER, f'{participant_name}.docx')
     doc.save(docx_path)
+    return docx_path
 
 
 def generate_certificates(file_path, event_name, ambassador_name):
     df = pd.read_csv(file_path)
     for index, row in df.iterrows():
         participant_name = row['Name']
-        generate_certificate(participant_name, event_name, ambassador_name)
+        docx_path = generate_certificate(participant_name, event_name, ambassador_name)
+        convert_to_pdf(docx_path)
+
+
+def convert_to_pdf(docx_path):
+    result = convertapi.convert('pdf', {
+        'File': docx_path
+    }, from_format='docx')
+
+    pdf_path = docx_path.replace('.docx', '.pdf')
+    result.file.save(pdf_path)
+    os.remove(docx_path)
+
+
 
 
 def create_zip(event_name):
@@ -116,7 +133,7 @@ def create_zip(event_name):
     with ZipFile(zip_file_path, 'w') as zipf:
         for folder_name, subfolders, filenames in os.walk(CERTIFICATE_FOLDER):
             for filename in filenames:
-                if filename.endswith('.docx'):
+                if filename.endswith('.pdf'):
                     file_path = os.path.join(folder_name, filename)
                     zipf.write(file_path, os.path.basename(file_path))
     return zip_file_path
