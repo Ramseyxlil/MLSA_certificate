@@ -3,4 +3,4 @@ gunicorn
 Flask
 python-docx
 pandas
-pypandoc
+convertapi
