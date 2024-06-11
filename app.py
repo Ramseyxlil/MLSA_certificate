@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import convertapi
-from flask import Flask, request, send_file, render_template, redirect, url_for
+from flask import Flask, request, send_file, render_template, redirect, url_for, after_this_request
 from docx import Document
 from docx.shared import Pt, RGBColor
 from zipfile import ZipFile
@@ -50,11 +50,21 @@ def upload_file():
 
         zip_file_path = create_zip(event_name)
         download_url = url_for('download_file', path=zip_file_path)
+
+        # Delete the uploaded file
+        os.remove(file_path)
+
         return redirect(f'/?download_url={download_url}')
 
 
 @app.route('/download/<path:path>')
 def download_file(path):
+    @after_this_request
+    def remove_zip(response):
+        # Delete the ZIP file after it's downloaded
+        os.remove(path)
+        return response
+
     return send_file(path, as_attachment=True)
 
 
@@ -126,8 +136,6 @@ def convert_to_pdf(docx_path):
     os.remove(docx_path)
 
 
-
-
 def create_zip(event_name):
     zip_file_path = os.path.join(ZIP_FOLDER, f'{event_name}_certificates.zip')
     with ZipFile(zip_file_path, 'w') as zipf:
@@ -136,6 +144,14 @@ def create_zip(event_name):
                 if filename.endswith('.pdf'):
                     file_path = os.path.join(folder_name, filename)
                     zipf.write(file_path, os.path.basename(file_path))
+
+    # Delete the certificates folder
+    for root, dirs, files in os.walk(CERTIFICATE_FOLDER, topdown=False):
+        for name in files:
+            os.remove(os.path.join(root, name))
+        for name in dirs:
+            os.rmdir(os.path.join(root, name))
+
     return zip_file_path
 
 
